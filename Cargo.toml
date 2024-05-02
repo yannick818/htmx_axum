@@ -6,7 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-askama = "0.12.1"
-askama_axum = "0.4.0"
+# block feature isnt punlished yet
+askama = { git = "https://github.com/djc/askama" } 
+askama_axum = { git = "https://github.com/djc/askama" }
 axum = { version="0.7.5"}
 tokio = { version = "1.37.0", features = ["macros", "rt-multi-thread"] }

@@ -1,38 +1,50 @@
-use std::sync::Arc;
+use std::sync::{atomic::AtomicUsize, Arc};
 
-use askama_axum::{IntoResponse, Template};
+use askama_axum::Template;
 use axum::{
-    routing::get,
-    Router,
+    response::IntoResponse, routing::{get, post}, Router
 };
-use tokio::sync::Mutex;
 
 #[derive(Template)]
-#[template(path = "index.html")]
+#[template(path = "index.html", block = "index")]
 pub struct IndexHtml {
+    count: usize,
+}
+
+#[derive(Template)]
+#[template(path = "index.html", block = "counter")]
+pub struct CounterHtml {
     count: usize,
 }
 
 #[tokio::main]
 async fn main() -> ! {
-    let count = Arc::new(Mutex::new(0usize));
+    let count = Arc::new(AtomicUsize::new(0));
 
-    let counter_handler = {
-        move || {
-            async move {
-                let mut count = count.lock().await;
-                *count += 1;
-                IndexHtml{count: *count}
+    let app = Router::new()
+        .route("/", get({
+            let count = count.clone();
+            move || get_counter(count) 
             }
-        }
-    };
-
-    let app = Router::new().route("/", get(
-        counter_handler
-    ));
+        ))
+        .route("/count", post({
+            let count = count.clone();
+            move || inc_counter(count)
+            }
+        ));
 
     let listener = tokio::net::TcpListener::bind("localhost:3000").await.unwrap();
     println!("listening on http://{}", listener.local_addr().unwrap()); 
     axum::serve(listener, app).await.unwrap();
     panic!("the server has stopped");
+}
+
+async fn inc_counter(count: Arc<AtomicUsize>) -> impl IntoResponse {
+    count.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    CounterHtml{count: count.load(std::sync::atomic::Ordering::Relaxed)}
+}
+
+async fn get_counter(count: Arc<AtomicUsize>) -> impl IntoResponse {
+    let count = count.load(std::sync::atomic::Ordering::Relaxed);
+    IndexHtml{count}
 }
